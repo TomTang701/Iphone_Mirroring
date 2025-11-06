@@ -37,8 +37,10 @@ if (-not (Test-Path "$MsysRoot\usr\bin\bash.exe")) {
     Write-Host 'Downloading MSYS2 package...'
     Invoke-WebRequest -Uri $MsysInstaller -OutFile $tempFile
     Write-Host 'Extracting MSYS2...'
-    Start-Process -FilePath $tempFile -ArgumentList "-y", "-o$MsysRoot" -Wait
-    Remove-Item $tempFile
+    $msysInstaller = [System.IO.Path]::ChangeExtension($tempFile, '.exe')
+    Move-Item $tempFile $msysInstaller -Force
+    Start-Process -FilePath $msysInstaller -ArgumentList "-y", "-o$MsysRoot" -Wait
+    Remove-Item $msysInstaller
 }
 Invoke-Msys 'pacman --noconfirm -Syuu || pacman --noconfirm -Syuu'
 Invoke-Msys 'pacman --noconfirm -Syuu'
