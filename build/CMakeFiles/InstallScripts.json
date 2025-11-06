@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"F:/\u7231\u601d\u6295\u5c4f/\u81ea\u5df1\u641e\u7684/build/cmake_install.cmake",
+		"F:/\u7231\u601d\u6295\u5c4f/\u81ea\u5df1\u641e\u7684/build/lib/playfair/cmake_install.cmake",
+		"F:/\u7231\u601d\u6295\u5c4f/\u81ea\u5df1\u641e\u7684/build/lib/llhttp/cmake_install.cmake",
+		"F:/\u7231\u601d\u6295\u5c4f/\u81ea\u5df1\u641e\u7684/build/lib/cmake_install.cmake",
+		"F:/\u7231\u601d\u6295\u5c4f/\u81ea\u5df1\u641e\u7684/build/renderers/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
