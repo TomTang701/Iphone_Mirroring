@@ -39,8 +39,23 @@ if (-not (Test-Path "$MsysRoot\usr\bin\bash.exe")) {
     Write-Host 'Extracting MSYS2...'
     $msysInstaller = [System.IO.Path]::ChangeExtension($tempFile, '.exe')
     Move-Item $tempFile $msysInstaller -Force
-    Start-Process -FilePath $msysInstaller -ArgumentList "-y", "-o$MsysRoot" -Wait
-    Remove-Item $msysInstaller
+
+    $extractTarget = Split-Path -Parent $MsysRoot
+    if (-not (Test-Path $extractTarget)) {
+        New-Item -ItemType Directory -Path $extractTarget | Out-Null
+    }
+
+    Start-Process -FilePath $msysInstaller -ArgumentList "-y", "-o$extractTarget" -Wait
+    Remove-Item $msysInstaller -Force
+
+    if ((Split-Path -Leaf $MsysRoot) -ne 'msys64' -and (Test-Path "$extractTarget\msys64")) {
+        if (Test-Path $MsysRoot) {
+            Remove-Item $MsysRoot -Recurse -Force
+        }
+        Move-Item "$extractTarget\msys64" $MsysRoot
+    }
+} else {
+    Write-Host "MSYS2 already present at $MsysRoot - skipping download."
 }
 Invoke-Msys 'pacman --noconfirm -Syuu || pacman --noconfirm -Syuu'
 Invoke-Msys 'pacman --noconfirm -Syuu'
