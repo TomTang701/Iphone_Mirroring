@@ -73,11 +73,14 @@ if (-not (Test-Path "$WorkDir\.git")) {
 
 Write-Section '应用 Windows 适配补丁'
 Push-Location $WorkDir
-# 如果补丁已经合并到官方仓库，可以删除下面“git apply”这段。
+# 如果需要应用额外补丁，可把内容写入下方 here-string；默认留空即跳过。
 $patch = @'
 '@
-if ($patch.Trim()) {
-    git apply --allow-empty <<< $patch
+if (-not [string]::IsNullOrWhiteSpace($patch)) {
+    $tempPatch = [System.IO.Path]::GetTempFileName()
+    Set-Content -LiteralPath $tempPatch -Value $patch -Encoding UTF8
+    git apply --allow-empty $tempPatch
+    Remove-Item $tempPatch -Force
 }
 Pop-Location
 
