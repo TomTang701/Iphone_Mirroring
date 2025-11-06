@@ -1,18 +1,19 @@
 # =====================================================================
-# RPiPlay Windows 初始化脚本
-# 放在项目根目录，双击同目录下的 setup-rpiplay.bat 即可执行。
+# RPiPlay Windows initialization script
+# Place this script in the project root. Double-click setup-rpiplay.bat
+# (which calls this script) to install dependencies and build automatically.
 # =====================================================================
 
 $ErrorActionPreference = 'Stop'
 
-# === 可自行调整的参数 ===
-$WorkDir         = (Resolve-Path $PSScriptRoot).Path   # 默认使用脚本所在目录
-$RepoUrl         = 'https://github.com/FD-/RPiPlay.git'
-$MsysRoot        = 'C:\msys64'
-$MsysInstaller   = 'https://mirror.msys2.org/distrib/x86_64/msys2-base-x86_64-20250221.sfx.exe'
-$CreateShortcut  = $true
-$ShortcutName    = 'RPiPlay'
-# =========================
+# ==== Configurable parameters =================================================
+$WorkDir        = (Resolve-Path $PSScriptRoot).Path  # defaults to script directory
+$RepoUrl        = 'https://github.com/FD-/RPiPlay.git'
+$MsysRoot       = 'C:\msys64'
+$MsysInstaller  = 'https://mirror.msys2.org/distrib/x86_64/msys2-base-x86_64-20250221.sfx.exe'
+$CreateShortcut = $true
+$ShortcutName   = 'RPiPlay'
+# ==============================================================================
 
 function Write-Section {
     param([string]$Message)
@@ -25,24 +26,24 @@ function Invoke-Msys {
     $env:CHERE_INVOKING = '1'
     & "$MsysRoot\usr\bin\bash.exe" -lc $Command
     if ($LASTEXITCODE) {
-        throw "MSYS2 命令失败: $Command (exit $LASTEXITCODE)"
+        throw "MSYS2 command failed: $Command (exit $LASTEXITCODE)"
     }
     Remove-Item Env:MSYSTEM, Env:CHERE_INVOKING -ErrorAction SilentlyContinue
 }
 
-Write-Section '准备 MSYS2'
+Write-Section 'Preparing MSYS2'
 if (-not (Test-Path "$MsysRoot\usr\bin\bash.exe")) {
     $tempFile = New-TemporaryFile
-    Write-Host '下载 MSYS2 安装包...'
+    Write-Host 'Downloading MSYS2 package...'
     Invoke-WebRequest -Uri $MsysInstaller -OutFile $tempFile
-    Write-Host '解压 MSYS2 ...'
+    Write-Host 'Extracting MSYS2...'
     Start-Process -FilePath $tempFile -ArgumentList "-y", "-o$MsysRoot" -Wait
     Remove-Item $tempFile
 }
 Invoke-Msys 'pacman --noconfirm -Syuu || pacman --noconfirm -Syuu'
 Invoke-Msys 'pacman --noconfirm -Syuu'
 
-Write-Section '安装工具链和依赖 (UCRT64)'
+Write-Section 'Installing toolchain and dependencies'
 $packages = @(
     'mingw-w64-ucrt-x86_64-toolchain',
     'mingw-w64-ucrt-x86_64-cmake',
@@ -58,7 +59,7 @@ $packages = @(
 )
 Invoke-Msys "pacman --noconfirm -S --needed $($packages -join ' ')"
 
-Write-Section "准备代码 ($WorkDir)"
+Write-Section "Fetching repository ($WorkDir)"
 if (-not (Test-Path $WorkDir)) {
     New-Item -ItemType Directory -Path $WorkDir | Out-Null
 }
@@ -71,9 +72,9 @@ if (-not (Test-Path "$WorkDir\.git")) {
     Pop-Location
 }
 
-Write-Section '应用 Windows 适配补丁'
+Write-Section 'Applying optional Windows patches'
 Push-Location $WorkDir
-# 如果需要应用额外补丁，可把内容写入下方 here-string；默认留空即跳过。
+# Fill the here-string if you need to apply extra patches. Leave empty to skip.
 $patch = @'
 '@
 if (-not [string]::IsNullOrWhiteSpace($patch)) {
@@ -84,11 +85,11 @@ if (-not [string]::IsNullOrWhiteSpace($patch)) {
 }
 Pop-Location
 
-Write-Section '构建项目'
+Write-Section 'Building project'
 Invoke-Msys "cd $WorkDir && mkdir -p build && cd build && cmake .."
 Invoke-Msys "cd $WorkDir/build && cmake --build ."
 
-Write-Section '收集运行时 DLL'
+Write-Section 'Collecting runtime DLLs'
 $buildDir = Join-Path $WorkDir 'build'
 $dlls = @(
     'libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll',
@@ -108,7 +109,7 @@ foreach ($dll in $dlls) {
 }
 
 if ($CreateShortcut) {
-    Write-Section '创建桌面快捷方式'
+    Write-Section 'Creating desktop shortcut'
     $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) "$ShortcutName.lnk"
     $shell = New-Object -ComObject WScript.Shell
     $link = $shell.CreateShortcut($shortcutPath)
@@ -118,5 +119,5 @@ if ($CreateShortcut) {
     $link.Save()
 }
 
-Write-Section '完成'
-Write-Host "RPiPlay 已构建完成 (路径：$buildDir)，可直接双击 rpiplay.exe 运行。"
+Write-Section 'Done'
+Write-Host ("RPiPlay build complete. Output folder: {0}" -f $buildDir)
