@@ -20,7 +20,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <netinet/tcp.h>
 
 #include "raop.h"
 #include "netutils.h"
@@ -215,15 +214,28 @@ raop_rtp_mirror_thread(void *arg)
             struct timeval tv;
             tv.tv_sec = 0;
             tv.tv_usec = 5000;
-            if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+            if (setsockopt(stream_fd, SOL_SOCKET, SO_RCVTIMEO,
+#ifdef _WIN32
+                           (const char *)&tv,
+#else
+                           &tv,
+#endif
+                           sizeof(tv)) < 0) {
                 logger_log(raop_rtp_mirror->logger, LOGGER_ERR, "raop_rtp_mirror could not set stream socket timeout %d %s", errno, strerror(errno));
                 break;
             }
             int option;
             option = 1;
-            if (setsockopt(stream_fd, SOL_SOCKET, SO_KEEPALIVE, &option, sizeof(option)) < 0) {
+            if (setsockopt(stream_fd, SOL_SOCKET, SO_KEEPALIVE,
+#ifdef _WIN32
+                           (const char *)&option,
+#else
+                           &option,
+#endif
+                           sizeof(option)) < 0) {
                 logger_log(raop_rtp_mirror->logger, LOGGER_WARNING, "raop_rtp_mirror could not set stream socket keepalive %d %s", errno, strerror(errno));
             }
+#ifndef _WIN32
             option = 60;
             if (setsockopt(stream_fd, SOL_TCP, TCP_KEEPIDLE, &option, sizeof(option)) < 0) {
                 logger_log(raop_rtp_mirror->logger, LOGGER_WARNING, "raop_rtp_mirror could not set stream socket keepalive time %d %s", errno, strerror(errno));
@@ -236,6 +248,7 @@ raop_rtp_mirror_thread(void *arg)
             if (setsockopt(stream_fd, SOL_TCP, TCP_KEEPCNT, &option, sizeof(option)) < 0) {
                 logger_log(raop_rtp_mirror->logger, LOGGER_WARNING, "raop_rtp_mirror could not set stream socket keepalive probes %d %s", errno, strerror(errno));
             }
+#endif
             readstart = 0;
         }
 

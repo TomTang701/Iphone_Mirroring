@@ -12,15 +12,34 @@
  * Lesser General Public License for more details.
  */
 
-#include <time.h>
-#include <netinet/in.h>
 #include "byteutils.h"
+#include <time.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#ifndef htonll
+static inline uint64_t byteutils_htonll(uint64_t value) {
+    uint32_t high_part = (uint32_t)(value >> 32);
+    uint32_t low_part = (uint32_t)(value & 0xFFFFFFFFULL);
+    uint64_t swapped = ((uint64_t)htonl(low_part) << 32) | htonl(high_part);
+    return swapped;
+}
+static inline uint64_t byteutils_ntohll(uint64_t value) {
+    return byteutils_htonll(value);
+}
+#define htonll(x) byteutils_htonll((uint64_t)(x))
+#define ntohll(x) byteutils_ntohll((uint64_t)(x))
+#endif
+#else
+#include <netinet/in.h>
 #ifndef htonll
 #include <endian.h>
 #define htonll(x) htobe64(x)
 #define ntohll(x) be64toh(x)
 #endif
+#endif
+
 
 // The functions in this file assume a little endian cpu architecture!
 

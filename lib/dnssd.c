@@ -35,7 +35,9 @@
 #include "compat.h"
 #include "utils.h"
 
+#if !defined(WIN32)
 #include <dns_sd.h>
+#endif
 
 #define MAX_DEVICEID 18
 #define MAX_SERVNAME 256

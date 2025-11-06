@@ -1,7 +1,49 @@
-# Introduction
+# Introduction / 项目简介
 
-An open-source implementation of an AirPlay mirroring server for the Raspberry Pi.
-The goal is to make it run smoothly even on a Raspberry Pi Zero.
+This repository is an enhanced Windows-friendly distribution built on top of the
+upstream [RPiPlay project](https://github.com/FD-/RPiPlay). Besides keeping the
+original Raspberry Pi functionality, it bundles all runtime DLLs, enables the
+GStreamer renderer by default, and ships automation scripts that install MSYS2,
+pull dependencies, build rpiplay, and collect the necessary libraries with a
+single double-click.
+
+本仓库是在原始 [RPiPlay 项目](https://github.com/FD-/RPiPlay) 基础上进行的
+Windows 适配版本。除了保留树莓派平台的全部功能，我们额外打包了运行时 DLL、
+默认开启 GStreamer 渲染器，并提供“一键初始化”脚本（自动安装 MSYS2、下载依赖、
+编译 rpiplay 并收集所有 DLL），方便在 Windows 上开箱即用。
+
+The upstream documentation is kept below for reference; the Windows-specific
+workflow is documented in the next section.
+
+下方保留了上游文档以便参考，关于 Windows 的快速使用方式请查看下一节。
+
+## Windows quick start / 快速上手
+
+1. Double-click `setup-rpiplay.bat` in the project root. It invokes
+   `setup-rpiplay.ps1`, installs MSYS2 (if needed), downloads dependencies,
+   applies the Windows compatibility patches, builds rpiplay, and copies all
+   required DLLs into `build\`.
+2. After the script finishes, open `build\` and double-click `rpiplay.exe`
+   to expose an AirPlay target. No additional plugins are necessary; Bonjour’s
+   `dnssd.dll` provided by iTunes / Bonjour Print Services will be used
+   automatically when present.
+3. By default the runtime expects MSYS2 under `C:\msys64`. To use a different
+   location set environment variable `RPIPLAY_MSYS_ROOT` before launching
+   `rpiplay.exe`.
+
+1. 在项目根目录双击 `setup-rpiplay.bat`。该批处理会调用 `setup-rpiplay.ps1`
+   自动安装 MSYS2（如未安装）、下载依赖、应用 Windows 兼容补丁、编译 rpiplay
+   并把所有需要的 DLL 拷贝到 `build\`。
+2. 脚本执行完成后，进入 `build\` 目录双击 `rpiplay.exe` 即可在局域网中出现 AirPlay
+   目标，系统无需额外插件；若电脑已安装 iTunes/Bonjour Print Services，会自动使用
+   其中的 `dnssd.dll`。
+3. 默认假定 MSYS2 安装在 `C:\msys64`。若放在其他目录，请在启动前设置
+   `RPIPLAY_MSYS_ROOT` 环境变量指向对应路径。
+
+If you prefer manual operation, the original Raspbian / Linux instructions are
+preserved below.
+
+如果需要手动编译或在其他平台部署，可参考后续原作者提供的树莓派 / Linux 指南。
 
 
 # State
@@ -27,6 +69,31 @@ For rough details, refer to the (mostly obsolete) [inofficial AirPlay specificat
 
 
 # Building
+
+## Windows (one-click setup) / Windows 一键构建
+
+If you are using the packaged Windows variant in this repository:
+
+```text
+setup-rpiplay.bat   # run from the project root
+```
+
+The script installs MSYS2, all UCRT64 dependencies (toolchain, OpenSSL, libplist,
+GStreamer and plugins, etc.), applies the Windows compatibility patches, runs the
+build, and copies the necessary DLLs into `build\`. Afterwards you can start the
+server by double-clicking `build\rpiplay.exe`.
+
+如果使用本仓库提供的 Windows 套件：
+
+```text
+setup-rpiplay.bat   # 在项目根目录执行
+```
+
+脚本会安装 MSYS2、全部 UCRT64 依赖（工具链、OpenSSL、libplist、GStreamer 等），
+应用 Windows 兼容补丁，完成编译并将所需 DLL 拷贝到 `build\`；随后双击
+`build\rpiplay.exe` 即可运行。
+
+## Raspberry Pi / Linux
 
 The following packages are required for building on Raspbian:
 

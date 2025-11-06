@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.5)
 
 set(default_build_type "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -24,5 +24,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RENDERER_FLAGS}" )
 
 add_executable( rpiplay rpiplay.cpp)
 target_link_libraries ( rpiplay renderers airplay )
+if(WIN32)
+  target_link_libraries(rpiplay iphlpapi)
+endif()
 
 install(TARGETS rpiplay RUNTIME DESTINATION bin)

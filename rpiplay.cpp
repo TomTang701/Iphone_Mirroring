@@ -20,17 +20,70 @@
 #include <stddef.h>
 #include <cstring>
 #include <signal.h>
-#include <unistd.h>
 #include <string>
 #include <vector>
 #include <fstream>
+#include <cstdio>
+#include <cerrno>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#define sleep(x) Sleep((x) * 1000)
+
+static void ensure_windows_runtime_paths() {
+    auto get_msys_root = []() -> std::wstring {
+        wchar_t buffer[32768];
+        DWORD len = GetEnvironmentVariableW(L"RPIPLAY_MSYS_ROOT", buffer, static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0])));
+        if (len > 0) {
+            return std::wstring(buffer, len);
+        }
+        return L"C:\\msys64";
+    };
+
+    auto normalize = [](std::wstring path) -> std::wstring {
+        if (!path.empty() && (path.back() == L'\\' || path.back() == L'/')) {
+            path.pop_back();
+        }
+        return path;
+    };
+
+    const std::wstring msys_root = normalize(get_msys_root());
+    const std::wstring bin_path = msys_root + L"\\ucrt64\\bin";
+    const std::wstring gst_path = msys_root + L"\\ucrt64\\lib\\gstreamer-1.0";
+
+    wchar_t buffer[32768];
+    DWORD len = GetEnvironmentVariableW(L"PATH", buffer, static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0])));
+    std::wstring path = len ? std::wstring(buffer, len) : std::wstring();
+    if (path.find(bin_path) == std::wstring::npos) {
+        if (!path.empty() && path.back() != L';') {
+            path.push_back(L';');
+        }
+        path.append(bin_path);
+        SetEnvironmentVariableW(L"PATH", path.c_str());
+    }
+
+    SetEnvironmentVariableW(L"GST_PLUGIN_SYSTEM_PATH", gst_path.c_str());
+    SetEnvironmentVariableW(L"GST_PLUGIN_SYSTEM_PATH_1_0", gst_path.c_str());
+    SetEnvironmentVariableW(L"GST_REGISTRY", L".\\gst-registry.bin");
+}
+#else
+#include <unistd.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #ifdef __linux__
 #include <netpacket/packet.h>
 #else
 #include <net/if_dl.h>   /* macOS and *BSD */
+#endif
 #endif
 
 #include "log.h"
@@ -115,6 +168,10 @@ static void signal_handler(int sig) {
 }
 
 static void init_signals(void) {
+#ifdef _WIN32
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+#else
     struct sigaction sigact;
 
     sigact.sa_handler = signal_handler;
@@ -122,6 +179,7 @@ static void init_signals(void) {
     sigact.sa_flags = 0;
     sigaction(SIGINT, &sigact, NULL);
     sigaction(SIGTERM, &sigact, NULL);
+#endif
 }
 
 static int parse_hw_addr(std::string str, std::vector<char> &hw_addr) {
@@ -135,7 +193,45 @@ static std::string find_mac () {
 /*  finds the MAC address of the first active network interface *
  *  in a Linux, *BSD or macOS system.                           */
     std::string mac_address = "";
-    struct ifaddrs *ifap, *ifaptr;
+#ifdef _WIN32
+    ULONG buffer_size = 0;
+    DWORD result = GetAdaptersAddresses(AF_UNSPEC,
+                                        GAA_FLAG_SKIP_ANYCAST |
+                                        GAA_FLAG_SKIP_MULTICAST |
+                                        GAA_FLAG_SKIP_DNS_SERVER,
+                                        NULL, NULL, &buffer_size);
+    if (result != ERROR_BUFFER_OVERFLOW) {
+        return mac_address;
+    }
+
+    std::vector<unsigned char> buffer(buffer_size);
+    PIP_ADAPTER_ADDRESSES addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+    result = GetAdaptersAddresses(AF_UNSPEC,
+                                  GAA_FLAG_SKIP_ANYCAST |
+                                  GAA_FLAG_SKIP_MULTICAST |
+                                  GAA_FLAG_SKIP_DNS_SERVER,
+                                  NULL, addresses, &buffer_size);
+    if (result != NO_ERROR) {
+        return mac_address;
+    }
+
+    for (PIP_ADAPTER_ADDRESSES current = addresses; current != NULL; current = current->Next) {
+        if (current->PhysicalAddressLength == 6 &&
+            current->IfType != IF_TYPE_SOFTWARE_LOOPBACK &&
+            current->OperStatus == IfOperStatusUp) {
+            char formatted[18] = {0};
+            snprintf(formatted, sizeof(formatted),
+                     "%02x:%02x:%02x:%02x:%02x:%02x",
+                     current->PhysicalAddress[0], current->PhysicalAddress[1],
+                     current->PhysicalAddress[2], current->PhysicalAddress[3],
+                     current->PhysicalAddress[4], current->PhysicalAddress[5]);
+            mac_address = formatted;
+            break;
+        }
+    }
+    return mac_address;
+#else
+    struct ifaddrs *ifap = NULL, *ifaptr;
     int non_null_octets = 0;
     unsigned char octet[6], *ptr;
     if (getifaddrs(&ifap) == 0) {
@@ -167,8 +263,11 @@ static std::string find_mac () {
             }
         }
     }
-    freeifaddrs(ifap);
+    if (ifap) {
+        freeifaddrs(ifap);
+    }
     return mac_address;
+#endif
 }
 
 static video_init_func_t find_video_init_func(const char *name) {
@@ -212,6 +311,9 @@ void print_info(char *name) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef _WIN32
+    ensure_windows_runtime_paths();
+#endif
     init_signals();
     
     std::string server_name = DEFAULT_NAME;
