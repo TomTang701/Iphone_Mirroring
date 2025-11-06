@@ -203,7 +203,8 @@ raop_ntp_init_socket(raop_ntp_t *raop_ntp, int use_ipv6)
     struct timeval tv;
     tv.tv_sec = 0;
     tv.tv_usec = 300000;
-    if (setsockopt(tsock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+    if (setsockopt(tsock, SOL_SOCKET, SO_RCVTIMEO,
+                   (const char *)&tv, sizeof(tv)) < 0) {
         goto sockets_cleanup;
     }
 
@@ -222,6 +223,27 @@ raop_ntp_init_socket(raop_ntp_t *raop_ntp, int use_ipv6)
 static void
 raop_ntp_flush_socket(int fd)
 {
+#if defined(WIN32)
+    u_long bytes_available = 0;
+    while (ioctlsocket(fd, FIONREAD, &bytes_available) == 0 && bytes_available > 0)
+    {
+        char discard[512];
+        u_long to_read = bytes_available > sizeof(discard) ? sizeof(discard) : bytes_available;
+        int result = recvfrom(fd, discard, (int)to_read, 0, NULL, NULL);
+        if (result <= 0)
+        {
+            break;
+        }
+        if ((u_long)result >= bytes_available)
+        {
+            bytes_available = 0;
+        }
+        else
+        {
+            bytes_available -= (u_long)result;
+        }
+    }
+#else
     int bytes_available = 0;
     while (ioctl(fd, FIONREAD, &bytes_available) == 0 && bytes_available > 0)
     {
@@ -234,6 +256,7 @@ raop_ntp_flush_socket(int fd)
             break;
         }
     }
+#endif
 }
 
 static THREAD_RETVAL
