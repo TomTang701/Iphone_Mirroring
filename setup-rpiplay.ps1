@@ -103,8 +103,8 @@ if (-not [string]::IsNullOrWhiteSpace($patch)) {
 Pop-Location
 
 Write-Section 'Building project'
-Invoke-Msys "cd $WorkDir && mkdir -p build && cd build && cmake .."
-Invoke-Msys "cd $WorkDir/build && cmake --build ."
+Invoke-Msys "cd `"$WorkDir`" && mkdir -p build && cd build && cmake .."
+Invoke-Msys "cd `"$WorkDir`"/build && cmake --build ."
 
 Write-Section 'Collecting runtime DLLs'
 $buildDir = Join-Path $WorkDir 'build'
