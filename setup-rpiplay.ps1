@@ -103,8 +103,10 @@ if (-not [string]::IsNullOrWhiteSpace($patch)) {
 Pop-Location
 
 Write-Section 'Building project'
-Invoke-Msys "cd `"$WorkDir`" && mkdir -p build && cd build && cmake .."
-Invoke-Msys "cd `"$WorkDir`"/build && cmake --build ."
+$MsysWorkDir = Convert-ToMsysPath $WorkDir
+$BuildDirMsys = "$MsysWorkDir/build"
+Invoke-Msys "cd '$MsysWorkDir' && mkdir -p build && cd build && cmake .."
+Invoke-Msys "cd '$BuildDirMsys' && cmake --build ."
 
 Write-Section 'Collecting runtime DLLs'
 $buildDir = Join-Path $WorkDir 'build'
@@ -138,3 +140,13 @@ if ($CreateShortcut) {
 
 Write-Section 'Done'
 Write-Host ("RPiPlay build complete. Output folder: {0}" -f $buildDir)
+# Convert a Windows path to MSYS style (e.g. C:\foo -> /c/foo)
+function Convert-ToMsysPath {
+    param([string]$Path)
+    $cygpath = Join-Path $MsysRoot 'usr\bin\cygpath.exe'
+    if (-not (Test-Path $cygpath)) {
+        throw "cygpath not found at $cygpath"
+    }
+    $converted = & $cygpath -u $Path
+    return $converted.Trim()
+}
