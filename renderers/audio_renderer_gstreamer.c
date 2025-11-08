@@ -20,6 +20,7 @@
 #include "audio_renderer.h"
 #include <assert.h>
 #include <math.h>
+#include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
 
 typedef struct audio_renderer_gstreamer_s {
@@ -27,8 +28,13 @@ typedef struct audio_renderer_gstreamer_s {
     GstElement *appsrc;
     GstElement *pipeline;
     GstElement *volume;
+    GstElement *sink;
+    GstElement *sync_queue;
+    bool low_latency;
+    GstClockTime latency_ns;
 } audio_renderer_gstreamer_t;
 
+static const GstClockTime DEFAULT_AV_DELAY = 200 * GST_MSECOND;
 static const audio_renderer_funcs_t audio_renderer_gstreamer_funcs;
 
 static gboolean check_plugins(void)
@@ -72,12 +78,33 @@ audio_renderer_t *audio_renderer_gstreamer_init(logger_t *logger, video_renderer
 
     assert(check_plugins());
 
-    renderer->pipeline = gst_parse_launch("appsrc name=audio_source stream-type=0 format=GST_FORMAT_TIME is-live=true ! queue ! decodebin !"
-    "audioconvert ! volume name=volume ! level ! autoaudiosink sync=false", &error);
+    renderer->low_latency = config->low_latency;
+    renderer->latency_ns = renderer->low_latency ? 0 : DEFAULT_AV_DELAY;
+
+    renderer->pipeline = gst_parse_launch("appsrc name=audio_source stream-type=0 format=GST_FORMAT_TIME is-live=true ! "
+        "queue leaky=downstream max-size-time=200000000 ! decodebin ! audioconvert ! audioresample ! "
+        "queue2 name=sync_queue max-size-buffers=0 max-size-bytes=0 max-size-time=0 use-buffering=false ! "
+        "volume name=volume ! level ! autoaudiosink name=audio_sink sync=false", &error);
     g_assert(renderer->pipeline);
 
     renderer->appsrc = gst_bin_get_by_name(GST_BIN(renderer->pipeline), "audio_source");
     renderer->volume = gst_bin_get_by_name(GST_BIN(renderer->pipeline), "volume");
+    renderer->sink = gst_bin_get_by_name(GST_BIN(renderer->pipeline), "audio_sink");
+    renderer->sync_queue = gst_bin_get_by_name(GST_BIN(renderer->pipeline), "sync_queue");
+
+    if (renderer->sync_queue) {
+        if (renderer->low_latency) {
+            g_object_set(renderer->sync_queue,
+                         "use-buffering", FALSE,
+                         "min-threshold-time", (gint64)0,
+                         NULL);
+        } else {
+            g_object_set(renderer->sync_queue,
+                         "use-buffering", TRUE,
+                         "min-threshold-time", renderer->latency_ns,
+                         NULL);
+        }
+    }
 
     gchar eld_conf[] = {0xF8, 0xE8, 0x50, 0x00};
     GstBuffer *codec_data = gst_buffer_new_and_alloc(sizeof(eld_conf));
@@ -111,18 +138,16 @@ void audio_renderer_gstreamer_start(audio_renderer_t *renderer) {
 }
 
 void audio_renderer_gstreamer_render_buffer(audio_renderer_t *renderer, raop_ntp_t *ntp, unsigned char *data, int data_len, uint64_t pts) {
-    GstBuffer *buffer;
-
     if (data_len == 0) return;
-    
+
     audio_renderer_gstreamer_t *r = (audio_renderer_gstreamer_t *)renderer;
+    GstBuffer *buffer;
 
     buffer = gst_buffer_new_and_alloc(data_len);
     assert(buffer != NULL);
-    GST_BUFFER_DTS(buffer) = (GstClockTime)pts;
+
     gst_buffer_fill(buffer, 0, data, data_len);
     gst_app_src_push_buffer(GST_APP_SRC(r->appsrc), buffer);
-
 }
 
 void audio_renderer_gstreamer_set_volume(audio_renderer_t *renderer, float volume) {
@@ -135,6 +160,7 @@ void audio_renderer_gstreamer_set_volume(audio_renderer_t *renderer, float volum
 }
 
 void audio_renderer_gstreamer_flush(audio_renderer_t *renderer) {
+    audio_renderer_gstreamer_t *r = (audio_renderer_gstreamer_t *)renderer;
 }
 
 void audio_renderer_gstreamer_destroy(audio_renderer_t *renderer) {
@@ -144,6 +170,10 @@ void audio_renderer_gstreamer_destroy(audio_renderer_t *renderer) {
     gst_object_unref(r->pipeline);
     gst_object_unref(r->appsrc);
     gst_object_unref(r->volume);
+    gst_object_unref(r->sink);
+    if (r->sync_queue) {
+        gst_object_unref(r->sync_queue);
+    }
     if (renderer) {
         free(renderer);
     }

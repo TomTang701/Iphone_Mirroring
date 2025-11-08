@@ -137,13 +137,12 @@ static void video_renderer_gstreamer_render_buffer(video_renderer_t *renderer, r
 
     buffer = gst_buffer_new_and_alloc(data_len);
     assert(buffer != NULL);
-    GST_BUFFER_DTS(buffer) = (GstClockTime)pts;
     gst_buffer_fill(buffer, 0, data, data_len);
     gst_app_src_push_buffer(GST_APP_SRC(r->appsrc), buffer);
 }
 
 void video_renderer_gstreamer_flush(video_renderer_t *renderer) {
-
+    (void)renderer;
 }
 
 void video_renderer_gstreamer_destroy(video_renderer_t *renderer) {

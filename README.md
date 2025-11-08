@@ -46,6 +46,19 @@ preserved below.
 如果需要手动编译或在其他平台部署，可参考后续原作者提供的树莓派 / Linux 指南。
 
 
+### Audio sync notes / 音频同步说明
+- The Windows build now runs the mirrored AAC stream through GStreamer and intentionally buffers roughly 200 ms so that decoded audio follows the video timeline. This keeps lip-sync intact even when packets arrive slightly late.
+- Launching piplay.exe with -l re-enables the legacy low-latency mode; frames play immediately but audio/video sync is no longer guaranteed.
+- 默认情况下，Windows 版本会在 GStreamer 中为音频保留约 200 ms 的缓冲，用于吸收抖动并确保音轨与画面一致（因此允许轻微延迟）。
+- 若更看重实时性，可在启动时附带 -l，这样会关闭同步缓冲，声音/画面会即时输出，但音画同步效果会下降。
+
+
+
+### Custom AirPlay name / 自定义投屏名称
+- Keep using -n <name> if you prefer CLI flags, or place a UTF-8 encoded 
+ame.txt next to piplay.exe; the first line becomes the advertised AirPlay name.
+- 也可以在可执行文件所在目录放置 
+ame.txt（第一行即 AirPlay 名称），程序启动时会读取；若文件不存在或为空，则继续使用默认名称或命令行参数。
 # State
 
 Screen mirroring and audio works for iOS 9 or newer. Recent macOS versions also seem to be compatible. The GPU is used for decoding the h264 video stream. The Pi has no hardware acceleration for audio (AirPlay mirroring uses AAC), so the FDK-AAC decoder is used for that.

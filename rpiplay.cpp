@@ -25,6 +25,7 @@
 #include <fstream>
 #include <cstdio>
 #include <cerrno>
+#include <cctype>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -133,6 +134,43 @@ static audio_init_func_t audio_init_func = NULL;
 static video_renderer_t *video_renderer = NULL;
 static audio_renderer_t *audio_renderer = NULL;
 static logger_t *render_logger = NULL;
+
+static std::string trim_copy(const std::string &str) {
+    size_t start = 0;
+    while (start < str.size() && std::isspace(static_cast<unsigned char>(str[start]))) {
+        start++;
+    }
+    if (start == str.size()) return "";
+
+    size_t end = str.size() - 1;
+    while (end > start && std::isspace(static_cast<unsigned char>(str[end]))) {
+        end--;
+    }
+    return str.substr(start, end - start + 1);
+}
+
+static void strip_utf8_bom(std::string &line) {
+    static const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
+    if (line.size() >= 3 &&
+        static_cast<unsigned char>(line[0]) == bom[0] &&
+        static_cast<unsigned char>(line[1]) == bom[1] &&
+        static_cast<unsigned char>(line[2]) == bom[2]) {
+        line.erase(0, 3);
+    }
+}
+
+static std::string load_name_from_file(const char *path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return "";
+    }
+
+    std::string line;
+    std::getline(file, line);
+    file.close();
+    strip_utf8_bom(line);
+    return trim_copy(line);
+}
 
 static const video_renderer_list_entry_t video_renderers[] = {
 #if defined(HAS_RPI_RENDERER)
@@ -317,6 +355,10 @@ int main(int argc, char *argv[]) {
     init_signals();
     
     std::string server_name = DEFAULT_NAME;
+    std::string file_name = load_name_from_file("name.txt");
+    if (!file_name.empty()) {
+        server_name = file_name;
+    }
     std::vector<char> server_hw_addr = DEFAULT_HW_ADDRESS;
     bool debug_log = DEFAULT_DEBUG_LOG;
 
