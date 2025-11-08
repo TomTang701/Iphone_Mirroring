@@ -115,13 +115,15 @@ if (-not (Get-Command Convert-ToMsysPath -ErrorAction SilentlyContinue)) {
     }
 }
 
+$buildDir = Join-Path $WorkDir 'build'
+Remove-Item -LiteralPath $buildDir -Recurse -Force -ErrorAction SilentlyContinue
+
 $MsysWorkDir = Convert-ToMsysPath $WorkDir
 $BuildDirMsys = "$MsysWorkDir/build"
 Invoke-Msys "cd '$MsysWorkDir' && mkdir -p build && cd build && cmake .."
 Invoke-Msys "cd '$BuildDirMsys' && cmake --build ."
 
 Write-Section 'Collecting runtime DLLs'
-$buildDir = Join-Path $WorkDir 'build'
 $dlls = @(
     'libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll',
     'libcrypto-3-x64.dll','libssl-3-x64.dll','libplist-2.0.dll',
