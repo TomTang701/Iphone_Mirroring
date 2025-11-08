@@ -135,7 +135,8 @@ $dlls = @(
     'libpcre2-8-0.dll','libffi-8.dll','zlib1.dll',
     'libngtcp2_crypto_ossl-0.dll','libngtcp2-16.dll','libnghttp3-9.dll',
     'libcurl-4.dll','libidn2-0.dll','libssh2-1.dll',
-    'libbrotlicommon.dll','libbrotlidec.dll','libzstd.dll'
+    'libbrotlicommon.dll','libbrotlidec.dll','libzstd.dll',
+    'libgstwasapi-1.0-0.dll'
 )
 foreach ($dll in $dlls) {
     Copy-Item "$MsysRoot\ucrt64\bin\$dll" "$buildDir\$dll" -Force
