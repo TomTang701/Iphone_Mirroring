@@ -103,6 +103,18 @@ if (-not [string]::IsNullOrWhiteSpace($patch)) {
 Pop-Location
 
 Write-Section 'Building project'
+if (-not (Get-Command Convert-ToMsysPath -ErrorAction SilentlyContinue)) {
+    function Convert-ToMsysPath {
+        param([string]$Path)
+        $cygpath = Join-Path $MsysRoot 'usr\bin\cygpath.exe'
+        if (-not (Test-Path $cygpath)) {
+            throw "cygpath not found at $cygpath"
+        }
+        $converted = & $cygpath -u $Path
+        return $converted.Trim()
+    }
+}
+
 $MsysWorkDir = Convert-ToMsysPath $WorkDir
 $BuildDirMsys = "$MsysWorkDir/build"
 Invoke-Msys "cd '$MsysWorkDir' && mkdir -p build && cd build && cmake .."
