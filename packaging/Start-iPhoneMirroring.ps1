@@ -37,13 +37,30 @@ if (-not $helpOnly -and -not (Test-BonjourRuntime)) {
     exit 1
 }
 
-$pluginDir = Join-Path $AppDir 'gstreamer-1.0'
-if (Test-Path -LiteralPath $pluginDir) {
-    $env:GST_PLUGIN_PATH = $pluginDir
+$portablePluginDir = Join-Path $AppDir 'ucrt64\lib\gstreamer-1.0'
+$portableBinDir = Join-Path $AppDir 'ucrt64\bin'
+$portableScannerExe = Join-Path $AppDir 'ucrt64\libexec\gstreamer-1.0\gst-plugin-scanner.exe'
+$legacyPluginDir = Join-Path $AppDir 'gstreamer-1.0'
+if (Test-Path -LiteralPath $portablePluginDir) {
+    $env:RPIPLAY_MSYS_ROOT = $AppDir
+    if (Test-Path -LiteralPath $portableBinDir) {
+        $env:PATH = "$portableBinDir;$env:PATH"
+    }
+    $env:GST_PLUGIN_PATH = $portablePluginDir
+    $env:GST_PLUGIN_SYSTEM_PATH = $portablePluginDir
+    $env:GST_PLUGIN_SYSTEM_PATH_1_0 = $portablePluginDir
+    if (Test-Path -LiteralPath $portableScannerExe) {
+        $env:GST_PLUGIN_SCANNER = $portableScannerExe
+    }
+} elseif (Test-Path -LiteralPath $legacyPluginDir) {
+    $env:GST_PLUGIN_PATH = $legacyPluginDir
+    $env:GST_PLUGIN_SYSTEM_PATH = $legacyPluginDir
+    $env:GST_PLUGIN_SYSTEM_PATH_1_0 = $legacyPluginDir
 }
 $env:GST_REGISTRY = Join-Path $AppDir 'gst-registry.bin'
 
 Set-Location $AppDir
+Write-Host 'iPhone Mirroring is running. Select this receiver from iPhone Screen Mirroring.' -ForegroundColor Cyan
 & $ExePath @RemainingArgs
 if ($LASTEXITCODE) {
     Write-Host "rpiplay exited with code $LASTEXITCODE" -ForegroundColor Yellow
