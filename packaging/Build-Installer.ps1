@@ -103,7 +103,10 @@ Title="iPhone Mirroring Setup"
 BeginPrompt="Install iPhone Mirroring for the current Windows user?"
 RunProgram="powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1"
 ;!@InstallEnd@!
-'@ | Set-Content -LiteralPath $ConfigPath -Encoding UTF8
+'@ | ForEach-Object {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($ConfigPath, $_, $utf8NoBom)
+}
 
 Write-Step 'Building self-extracting installer'
 $output = [System.IO.File]::Create($InstallerPath)
