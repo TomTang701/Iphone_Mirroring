@@ -1,19 +1,27 @@
 $ErrorActionPreference = 'Stop'
 
 $AppName = 'iPhone Mirroring'
-$DefaultInstallRoot = Join-Path $env:LOCALAPPDATA 'iPhoneMirroring'
+$SourceApp = Join-Path $PSScriptRoot 'app'
+$DefaultInstallRoot = if (Test-Path -LiteralPath $SourceApp) {
+    $PSScriptRoot
+} else {
+    Join-Path $env:LOCALAPPDATA 'iPhoneMirroring'
+}
 $InstallRoot = if ($env:IPHONE_MIRRORING_INSTALL_ROOT) {
     $env:IPHONE_MIRRORING_INSTALL_ROOT
 } else {
-    Write-Host "Install folder [$DefaultInstallRoot]"
-    $inputPath = Read-Host 'Press Enter for the default path, or type a full install folder'
-    if ([string]::IsNullOrWhiteSpace($inputPath)) {
+    if (Test-Path -LiteralPath $SourceApp) {
         $DefaultInstallRoot
     } else {
-        [Environment]::ExpandEnvironmentVariables($inputPath)
+        Write-Host "Install folder [$DefaultInstallRoot]"
+        $inputPath = Read-Host 'Press Enter for the default path, or type a full install folder'
+        if ([string]::IsNullOrWhiteSpace($inputPath)) {
+            $DefaultInstallRoot
+        } else {
+            [Environment]::ExpandEnvironmentVariables($inputPath)
+        }
     }
 }
-$SourceApp = Join-Path $PSScriptRoot 'app'
 $ExePath = Join-Path $InstallRoot 'rpiplay.exe'
 $LauncherPath = Join-Path $InstallRoot 'Start-iPhoneMirroring.cmd'
 $UninstallPath = Join-Path $InstallRoot 'uninstall.ps1'

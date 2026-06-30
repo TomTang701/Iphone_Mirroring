@@ -15,8 +15,10 @@ $PortablePluginDir = Join-Path $AppStageDir 'ucrt64\lib\gstreamer-1.0'
 $PortableScannerDir = Join-Path $AppStageDir 'ucrt64\libexec\gstreamer-1.0'
 $OutputDir = Join-Path $DistDir 'installer'
 $ArchivePath = Join-Path $DistDir 'payload.7z'
+$PayloadZipPath = Join-Path $DistDir 'payload.zip'
 $ConfigPath = Join-Path $DistDir 'sfx-config.txt'
 $InstallerPath = Join-Path $OutputDir 'iPhone-Mirroring-Setup.exe'
+$BootstrapSource = Join-Path $PSScriptRoot 'InstallerBootstrap.cs'
 $MsysRoot = if ($env:RPIPLAY_PACKAGE_MSYS_ROOT) { $env:RPIPLAY_PACKAGE_MSYS_ROOT } else { 'F:\msys64' }
 $MsysBinDir = Join-Path $MsysRoot 'ucrt64\bin'
 $MsysPluginDir = Join-Path $MsysRoot 'ucrt64\lib\gstreamer-1.0'
@@ -157,61 +159,39 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-iPhoneMirroring.ps1') -De
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-iPhoneMirroring.cmd') -Destination $AppStageDir -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'INSTALLER-README.txt') -Destination $StageDir -Force
 
-Write-Step 'Creating payload archive'
-Remove-Item -LiteralPath $ArchivePath, $ConfigPath, $InstallerPath -Force -ErrorAction SilentlyContinue
-Push-Location $StageDir
-try {
-    & 7z.exe a -t7z -mx=9 $ArchivePath '.\*' | Out-Host
-    if ($LASTEXITCODE) {
-        throw "7z archive creation failed with exit code $LASTEXITCODE"
-    }
-} finally {
-    Pop-Location
+Write-Step 'Creating embedded payload zip'
+Remove-Item -LiteralPath $ArchivePath, $PayloadZipPath, $ConfigPath, $InstallerPath -Force -ErrorAction SilentlyContinue
+Compress-Archive -Path (Join-Path $StageDir '*') -DestinationPath $PayloadZipPath -CompressionLevel Optimal
+
+$compiler = @(
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $compiler) {
+    throw 'C# compiler was not found. Install .NET Framework 4.x developer tools or run on a standard Windows installation.'
 }
 
-$sfxCandidates = @(
-    'C:\Program Files\WindowsApps\40174MouriNaruto.NanaZip_6.5.1750.0_x64__gnj4mf6z9tkrc\NanaZip.Core.Windows.sfx',
-    'C:\Program Files\WindowsApps\40174MouriNaruto.NanaZip_6.5.1750.0_x64__gnj4mf6z9tkrc\NanaZip.Core.Console.sfx'
+Write-Step 'Compiling self-contained installer'
+& $compiler @(
+    '/nologo',
+    '/target:winexe',
+    '/platform:anycpu',
+    '/optimize+',
+    '/reference:System.IO.Compression.dll',
+    '/reference:System.IO.Compression.FileSystem.dll',
+    '/reference:System.Windows.Forms.dll',
+    '/reference:System.Drawing.dll',
+    "/out:$InstallerPath",
+    "/resource:$PayloadZipPath,payload.zip",
+    $BootstrapSource
 )
-$sfxModule = $sfxCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $sfxModule) {
-    $sfxModule = Get-ChildItem -Path 'C:\Program Files\WindowsApps' -Filter '*.sfx' -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match 'Windows|Console' } |
-        Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $sfxModule) {
-    throw 'No 7-Zip/NanaZip SFX module was found. Install NanaZip or 7-Zip with SFX support, then rerun this script.'
-}
-
-@'
-;!@Install@!UTF-8!
-Title="iPhone Mirroring Setup"
-BeginPrompt="Install iPhone Mirroring for the current Windows user?"
-RunProgram="powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1"
-;!@InstallEnd@!
-'@ | ForEach-Object {
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($ConfigPath, $_, $utf8NoBom)
-}
-
-Write-Step 'Building self-extracting installer'
-$output = [System.IO.File]::Create($InstallerPath)
-try {
-    foreach ($part in @($sfxModule, $ConfigPath, $ArchivePath)) {
-        $input = [System.IO.File]::OpenRead($part)
-        try {
-            $input.CopyTo($output)
-        } finally {
-            $input.Dispose()
-        }
-    }
-} finally {
-    $output.Dispose()
+if ($LASTEXITCODE) {
+    throw "Installer compilation failed with exit code $LASTEXITCODE"
 }
 
 Write-Step 'Done'
 Get-Item -LiteralPath $InstallerPath | Select-Object FullName, Length, LastWriteTime
 
 if (-not $KeepWork) {
-    Remove-Item -LiteralPath $StageDir, $ArchivePath, $ConfigPath -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $StageDir, $ArchivePath, $PayloadZipPath, $ConfigPath -Recurse -Force -ErrorAction SilentlyContinue
 }
