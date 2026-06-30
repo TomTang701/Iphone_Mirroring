@@ -23,6 +23,8 @@
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
 
+#include <string.h>
+
 typedef struct audio_renderer_gstreamer_s {
     audio_renderer_t base;
     GstElement *appsrc;
@@ -32,17 +34,47 @@ typedef struct audio_renderer_gstreamer_s {
     GstElement *sync_queue;
     bool low_latency;
     GstClockTime latency_ns;
+    unsigned int buffers_seen;
 } audio_renderer_gstreamer_t;
 
 static const GstClockTime DEFAULT_AV_DELAY = 200 * GST_MSECOND;
 static const audio_renderer_funcs_t audio_renderer_gstreamer_funcs;
+
+static void audio_renderer_gstreamer_log_bus(audio_renderer_gstreamer_t *r) {
+    GstBus *bus = gst_element_get_bus(r->pipeline);
+    GstMessage *msg;
+
+    while ((msg = gst_bus_pop_filtered(bus, GST_MESSAGE_ERROR | GST_MESSAGE_WARNING | GST_MESSAGE_STATE_CHANGED))) {
+        if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_ERROR) {
+            GError *err = NULL;
+            gchar *debug = NULL;
+            gst_message_parse_error(msg, &err, &debug);
+            logger_log(r->base.logger, LOGGER_ERR, "GStreamer audio error from %s: %s%s%s",
+                       GST_OBJECT_NAME(msg->src), err ? err->message : "unknown",
+                       debug ? " debug=" : "", debug ? debug : "");
+            if (err) g_error_free(err);
+            if (debug) g_free(debug);
+        } else if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_WARNING) {
+            GError *err = NULL;
+            gchar *debug = NULL;
+            gst_message_parse_warning(msg, &err, &debug);
+            logger_log(r->base.logger, LOGGER_WARNING, "GStreamer audio warning from %s: %s%s%s",
+                       GST_OBJECT_NAME(msg->src), err ? err->message : "unknown",
+                       debug ? " debug=" : "", debug ? debug : "");
+            if (err) g_error_free(err);
+            if (debug) g_free(debug);
+        }
+        gst_message_unref(msg);
+    }
+    gst_object_unref(bus);
+}
 
 static gboolean check_plugins(void)
 {
     int i;
     gboolean ret;
     GstRegistry *registry;
-    const gchar *needed[] = {"app", "libav", "playback", "autodetect", NULL};
+    const gchar *needed[] = {"app", "libav", "playback", "wasapi", NULL};
 
     registry = gst_registry_get();
     ret = TRUE;
@@ -81,10 +113,10 @@ audio_renderer_t *audio_renderer_gstreamer_init(logger_t *logger, video_renderer
     renderer->low_latency = config->low_latency;
     renderer->latency_ns = renderer->low_latency ? 0 : DEFAULT_AV_DELAY;
 
-    renderer->pipeline = gst_parse_launch("appsrc name=audio_source stream-type=0 format=GST_FORMAT_TIME is-live=true ! "
+    renderer->pipeline = gst_parse_launch("appsrc name=audio_source stream-type=0 format=GST_FORMAT_TIME is-live=true do-timestamp=true ! "
         "queue leaky=downstream max-size-time=200000000 ! decodebin ! audioconvert ! audioresample ! "
-        "queue2 name=sync_queue max-size-buffers=0 max-size-bytes=0 max-size-time=0 use-buffering=false ! "
-        "volume name=volume ! level ! autoaudiosink name=audio_sink sync=false", &error);
+        "queue name=sync_queue max-size-buffers=0 max-size-bytes=0 max-size-time=0 ! "
+        "volume name=volume ! level ! wasapisink name=audio_sink sync=false", &error);
     g_assert(renderer->pipeline);
 
     renderer->appsrc = gst_bin_get_by_name(GST_BIN(renderer->pipeline), "audio_source");
@@ -95,12 +127,10 @@ audio_renderer_t *audio_renderer_gstreamer_init(logger_t *logger, video_renderer
     if (renderer->sync_queue) {
         if (renderer->low_latency) {
             g_object_set(renderer->sync_queue,
-                         "use-buffering", FALSE,
                          "min-threshold-time", (gint64)0,
                          NULL);
         } else {
             g_object_set(renderer->sync_queue,
-                         "use-buffering", TRUE,
                          "min-threshold-time", renderer->latency_ns,
                          NULL);
         }
@@ -111,10 +141,7 @@ audio_renderer_t *audio_renderer_gstreamer_init(logger_t *logger, video_renderer
     GstMapInfo map;
 
     gst_buffer_map(codec_data, &map, GST_MAP_WRITE);
-    memset(map.data, eld_conf[0], map.size);
-    memset(map.data+1, eld_conf[1], map.size);
-    memset(map.data+2, eld_conf[2], map.size);
-    memset(map.data+3, eld_conf[3], map.size);
+    memcpy(map.data, eld_conf, sizeof(eld_conf));
 
     GstCaps *caps = gst_caps_new_simple("audio/mpeg",
         "rate", G_TYPE_INT, 44100,
@@ -134,7 +161,10 @@ audio_renderer_t *audio_renderer_gstreamer_init(logger_t *logger, video_renderer
 
 void audio_renderer_gstreamer_start(audio_renderer_t *renderer) {
     audio_renderer_gstreamer_t *r = (audio_renderer_gstreamer_t *)renderer;
-    gst_element_set_state(r->pipeline, GST_STATE_PLAYING);
+    GstStateChangeReturn ret = gst_element_set_state(r->pipeline, GST_STATE_PLAYING);
+    logger_log(renderer->logger, LOGGER_INFO, "GStreamer audio pipeline start ret=%d latency_ms=%llu",
+               ret, (unsigned long long)(r->latency_ns / GST_MSECOND));
+    audio_renderer_gstreamer_log_bus(r);
 }
 
 void audio_renderer_gstreamer_render_buffer(audio_renderer_t *renderer, raop_ntp_t *ntp, unsigned char *data, int data_len, uint64_t pts) {
@@ -147,7 +177,17 @@ void audio_renderer_gstreamer_render_buffer(audio_renderer_t *renderer, raop_ntp
     assert(buffer != NULL);
 
     gst_buffer_fill(buffer, 0, data, data_len);
-    gst_app_src_push_buffer(GST_APP_SRC(r->appsrc), buffer);
+    r->buffers_seen++;
+    if (r->buffers_seen <= 5 || (r->buffers_seen % 250) == 0) {
+        logger_log(renderer->logger, LOGGER_INFO, "GStreamer audio AAC buffer #%u len=%d", r->buffers_seen, data_len);
+    }
+    GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(r->appsrc), buffer);
+    if (ret != GST_FLOW_OK) {
+        logger_log(renderer->logger, LOGGER_ERR, "GStreamer audio push failed ret=%d", ret);
+    }
+    if (r->buffers_seen <= 5 || ret != GST_FLOW_OK) {
+        audio_renderer_gstreamer_log_bus(r);
+    }
 }
 
 void audio_renderer_gstreamer_set_volume(audio_renderer_t *renderer, float volume) {
