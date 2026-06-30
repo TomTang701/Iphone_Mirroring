@@ -1,10 +1,17 @@
 $ErrorActionPreference = 'Stop'
 
 $AppName = 'iPhone Mirroring'
+$DefaultInstallRoot = Join-Path $env:LOCALAPPDATA 'iPhoneMirroring'
 $InstallRoot = if ($env:IPHONE_MIRRORING_INSTALL_ROOT) {
     $env:IPHONE_MIRRORING_INSTALL_ROOT
 } else {
-    Join-Path $env:LOCALAPPDATA 'iPhoneMirroring'
+    Write-Host "Install folder [$DefaultInstallRoot]"
+    $inputPath = Read-Host 'Press Enter for the default path, or type a full install folder'
+    if ([string]::IsNullOrWhiteSpace($inputPath)) {
+        $DefaultInstallRoot
+    } else {
+        [Environment]::ExpandEnvironmentVariables($inputPath)
+    }
 }
 $SourceApp = Join-Path $PSScriptRoot 'app'
 $ExePath = Join-Path $InstallRoot 'rpiplay.exe'
@@ -81,8 +88,12 @@ function Install-BonjourIfWanted {
 }
 
 Write-Step "Installing $AppName to $InstallRoot"
-New-Item -ItemType Directory -Path $InstallRoot | Out-Null
-Copy-Item -Path (Join-Path $SourceApp '*') -Destination $InstallRoot -Recurse -Force
+New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+if (Test-Path -LiteralPath $SourceApp) {
+    Copy-Item -Path (Join-Path $SourceApp '*') -Destination $InstallRoot -Recurse -Force
+} elseif (-not (Test-Path -LiteralPath $ExePath)) {
+    throw "Missing installer payload: $SourceApp"
+}
 if (-not (Test-Path -LiteralPath $ExePath)) {
     throw "Installation failed: rpiplay.exe was not copied to $InstallRoot"
 }
