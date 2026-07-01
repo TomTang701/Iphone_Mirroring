@@ -1,0 +1,65 @@
+# Changelog
+
+All notable changes for this Windows iPhone Mirroring distribution are tracked
+here.
+
+## 2026-06-30 - Self-contained Windows installer
+
+### Added
+
+- Added `iPhone-Mirroring-Setup.exe` as a self-contained Windows installer.
+- Added `packaging/InstallerBootstrap.cs`, a small installer bootstrapper that:
+  - prompts for the install folder,
+  - extracts the embedded payload,
+  - runs `install.ps1`,
+  - creates the desktop shortcut.
+- Added a Chinese README at `README.zh-CN.md`.
+- Added language links between `README.md` and `README.zh-CN.md`.
+
+### Changed
+
+- Replaced the previous NanaZip/7-Zip SFX package with a real installer
+  executable that does not require NanaZip, 7-Zip, or other local extraction
+  software.
+- Updated the installer so the folder selected in the setup window is the final
+  install folder.
+- Updated `install.ps1` to create desktop and Start Menu shortcuts after
+  installation.
+- Updated `Start-iPhoneMirroring.cmd` to launch PowerShell through the Windows
+  system path first, improving reliability on fresh machines.
+- Updated `Start-iPhoneMirroring.ps1` to configure the portable GStreamer
+  runtime from the install folder before starting `rpiplay.exe`.
+- Rewrote the default `README.md` as the English documentation.
+
+### Fixed
+
+- Fixed Windows audio playback by correcting AAC codec data initialization.
+- Fixed audio/video sync by using a GStreamer audio pipeline with timestamped
+  appsrc buffers and a small sync queue.
+- Fixed missing video window in the portable install by packaging the required
+  GStreamer `d3d11` and `opengl` video output plugins.
+- Fixed portable GStreamer startup by packaging the plugin scanner and setting
+  `GST_PLUGIN_SCANNER`, `GST_PLUGIN_PATH`, and related environment variables.
+
+### Verified
+
+- Installed successfully to `F:\Iphone_Mirroring\Test2`.
+- Desktop shortcut points to `Start-iPhoneMirroring.cmd` in the selected install
+  folder.
+- Clean PATH startup works without relying on global MSYS2 or global GStreamer.
+- Portable install includes 124 runtime DLLs and 19 GStreamer plugins.
+
+## 中文更新摘要
+
+### 2026-06-30 - 自包含 Windows 安装器
+
+- 新增真正的 `iPhone-Mirroring-Setup.exe` 安装器，不再依赖本地 NanaZip 或
+  7-Zip。
+- 安装器会让用户选择安装目录，并自动解压、安装、创建桌面快捷方式。
+- 新增中文文档 `README.zh-CN.md`，英文和中文 README 可以互相点击切换。
+- 修复 Windows 下投屏有声音但没有画面的问题，安装包已包含 `d3d11` 和
+  `opengl` 视频输出插件。
+- 修复镜像音频 AAC 初始化和音画同步问题。
+- 启动器会自动配置安装目录内的 GStreamer DLL、插件路径和插件扫描器。
+- 已验证安装到 `F:\Iphone_Mirroring\Test2` 后可以独立启动，不依赖全局 MSYS2
+  或全局 GStreamer。
