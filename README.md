@@ -10,9 +10,9 @@ fixes.
 
 ## Download
 
-Use the packaged installer on the `codex/installer-packaging` branch:
+Download the latest formal installer from GitHub Releases:
 
-[Download iPhone-Mirroring-Setup.exe](iPhone-Mirroring-Setup.exe)
+[Download iPhone-Mirroring-Setup.exe](https://github.com/TomTang701/Iphone_Mirroring/releases/latest/download/iPhone-Mirroring-Setup.exe)
 
 The installer places the app, GStreamer DLLs, plugins, and launcher scripts into
 the selected install folder. A desktop shortcut named **iPhone Mirroring** is

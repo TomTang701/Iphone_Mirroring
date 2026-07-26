@@ -8,9 +8,9 @@ GStreamer 运行依赖、桌面快捷方式，以及 Windows 下的音画同步�
 
 ## 下载
 
-在 `codex/installer-packaging` 分支使用打包好的安装程序：
+请从 GitHub Releases 下载最新正式版安装程序：
 
-[下载 iPhone-Mirroring-Setup.exe](iPhone-Mirroring-Setup.exe)
+[下载 iPhone-Mirroring-Setup.exe](https://github.com/TomTang701/Iphone_Mirroring/releases/latest/download/iPhone-Mirroring-Setup.exe)
 
 安装程序会把应用、GStreamer DLL、插件和启动脚本安装到你选择的目录，并自动创建
 名为 **iPhone Mirroring** 的桌面快捷方式。
