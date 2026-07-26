@@ -1,4 +1,5 @@
 param(
+    [string]$MsysRoot,
     [switch]$KeepWork
 )
 
@@ -19,7 +20,16 @@ $PayloadZipPath = Join-Path $DistDir 'payload.zip'
 $ConfigPath = Join-Path $DistDir 'sfx-config.txt'
 $InstallerPath = Join-Path $OutputDir 'iPhone-Mirroring-Setup.exe'
 $BootstrapSource = Join-Path $PSScriptRoot 'InstallerBootstrap.cs'
-$MsysRoot = if ($env:RPIPLAY_PACKAGE_MSYS_ROOT) { $env:RPIPLAY_PACKAGE_MSYS_ROOT } else { 'F:\msys64' }
+$MsysRoot = if ($MsysRoot) {
+    $MsysRoot
+} elseif ($env:RPIPLAY_PACKAGE_MSYS_ROOT) {
+    $env:RPIPLAY_PACKAGE_MSYS_ROOT
+} elseif ($env:MSYS2_ROOT) {
+    $env:MSYS2_ROOT
+} else {
+    throw 'MSYS2 root is required. Pass -MsysRoot or set RPIPLAY_PACKAGE_MSYS_ROOT.'
+}
+$MsysRoot = (Resolve-Path -LiteralPath ([Environment]::ExpandEnvironmentVariables($MsysRoot))).Path
 $MsysBinDir = Join-Path $MsysRoot 'ucrt64\bin'
 $MsysPluginDir = Join-Path $MsysRoot 'ucrt64\lib\gstreamer-1.0'
 $MsysScannerExe = Join-Path $MsysRoot 'ucrt64\libexec\gstreamer-1.0\gst-plugin-scanner.exe'
@@ -75,7 +85,7 @@ if (-not (Test-Path -LiteralPath $RpiplayExe)) {
     $RpiplayExe = Join-Path $BuildDir 'rpiplay.exe'
 }
 if (-not (Test-Path -LiteralPath $RpiplayExe)) {
-    throw "Missing rpiplay.exe. Build the project first with F:\msys64, then rerun this script."
+    throw 'Missing rpiplay.exe. Build the project from an MSYS2 UCRT64 shell, then rerun this script.'
 }
 if (-not (Test-Path -LiteralPath $MsysPluginDir)) {
     throw "Missing GStreamer plugin directory: $MsysPluginDir"

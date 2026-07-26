@@ -14,14 +14,15 @@ Download the latest formal installer from GitHub Releases:
 
 [Download iPhone-Mirroring-Setup.exe](https://github.com/TomTang701/Iphone_Mirroring/releases/latest/download/iPhone-Mirroring-Setup.exe)
 
-The installer places the app, GStreamer DLLs, plugins, and launcher scripts into
-the selected install folder. A desktop shortcut named **iPhone Mirroring** is
-created automatically.
+The installer suggests `%LOCALAPPDATA%\iPhoneMirroring` as the install folder.
+You can select a different folder in the setup window. It places the app,
+GStreamer DLLs, plugins, and launcher scripts into that selected folder, then
+creates a desktop shortcut named **iPhone Mirroring**.
 
 ## Quick Start
 
 1. Download and run `iPhone-Mirroring-Setup.exe`.
-2. Choose an install folder, for example `F:\Iphone_Mirroring\Test2`.
+2. Keep the suggested per-user folder or choose a different install folder.
 3. Launch **iPhone Mirroring** from the desktop shortcut.
 4. On your iPhone or iPad, open Control Center, choose **Screen Mirroring**, and
    select the receiver.
@@ -30,15 +31,42 @@ Run `Start-iPhoneMirroring.cmd`, not `rpiplay.exe` directly. The launcher sets
 the portable DLL path, GStreamer plugin path, plugin scanner, and registry path
 before starting `rpiplay.exe`.
 
+## Zero-setup install from PowerShell
+
+You do not need Git, MSYS2, Python, CMake, or a separate GStreamer install.
+On a standard Windows PC, paste the following into PowerShell to download the
+latest GitHub Release installer to a temporary folder and start it:
+
+```powershell
+$installerUrl = 'https://github.com/TomTang701/Iphone_Mirroring/releases/latest/download/iPhone-Mirroring-Setup.exe'
+$installerPath = Join-Path $env:TEMP 'iPhone-Mirroring-Setup.exe'
+Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
+Start-Process -FilePath $installerPath -Wait
+```
+
+The setup window lets the user choose the install folder. Internet access is
+required for the download; Bonjour may still be installed separately if it is
+not already present.
+
 ## Dependencies
 
 The installer bundles the MSYS2/UCRT64 runtime files required by this build,
 including the GStreamer DLLs and plugins used for video, audio, and Windows
 window output.
 
-Bonjour is still required so iOS devices can discover the AirPlay receiver. If
-Bonjour is missing, the installer or launcher will prompt you to install Apple's
-Bonjour Print Services.
+### Bonjour Print Services (required for device discovery)
+
+[Apple Bonjour Print Services for Windows](https://support.apple.com/en-us/106380)
+is required so iPhone and iPad devices can discover this AirPlay receiver. It
+is an external Apple dependency and is not bundled with this project.
+
+- If Bonjour is missing during setup, the installer asks whether to download and
+  launch Apple's `BonjourPSSetup.exe`. The Apple installer can require
+  administrator approval.
+- If you skip Bonjour, iPhone Mirroring is installed, but iPhone/iPad devices
+  cannot discover the receiver from **Screen Mirroring**.
+- If Bonjour is still missing when the app is launched, the launcher explains
+  the problem and opens the Apple support page above.
 
 ## What This Windows Build Changes
 
@@ -53,16 +81,22 @@ Bonjour Print Services.
 
 ## Building the Installer
 
-The installer is built from a local MSYS2/UCRT64 environment.
+The installer is built from a local MSYS2/UCRT64 environment. Build
+`rpiplay.exe` from an MSYS2 UCRT64 shell first, then invoke the packaging script
+from the repository root in PowerShell:
 
 ```powershell
-cd F:\Iphone_Mirroring\Iphone_Mirroring-main
-F:\msys64\usr\bin\bash.exe -lc "export PATH=/ucrt64/bin:/usr/bin:/bin:$PATH; cd /f/Iphone_Mirroring/Iphone_Mirroring-main && cmake --build build-local"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\packaging\Build-Installer.ps1 -KeepWork
+# In an MSYS2 UCRT64 shell
+cmake --build build-local
+
+# In PowerShell, from this repository root
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\packaging\Build-Installer.ps1 -MsysRoot '<MSYS2 root>' -KeepWork
 ```
 
-By default, `Build-Installer.ps1` uses `F:\msys64`. To package from another
-MSYS2 root, set `RPIPLAY_PACKAGE_MSYS_ROOT` before running the script.
+Replace `<MSYS2 root>` with the MSYS2 installation on the build machine. As an
+alternative, set `RPIPLAY_PACKAGE_MSYS_ROOT` before running the script. The
+installer and its payload use only the end user's selected install folder; no
+build-machine path is embedded.
 
 ## Manual Launch Options
 

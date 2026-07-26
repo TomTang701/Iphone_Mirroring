@@ -3,6 +3,31 @@
 All notable changes for this Windows iPhone Mirroring distribution are tracked
 here.
 
+## 1.0.1 - 2026-07-26
+
+### Changed
+
+- Added a zero-setup PowerShell path that downloads and starts the latest
+  GitHub Release installer without requiring Git, MSYS2, Python, CMake, or a
+  separate GStreamer installation.
+- Documented Apple Bonjour Print Services as the required device-discovery
+  dependency, including the official Apple support link and the missing-
+  dependency behavior during setup and launch.
+- Removed build-machine-specific paths from documentation and installer-build
+  guidance. The packaging script now requires an explicit MSYS2 root or a
+  configured environment variable.
+- Updated the installer and per-user uninstall metadata to version `1.0.1`.
+
+## 中文更新摘要
+
+### 1.0.1 - 2026-07-26
+
+- 新增 PowerShell 零环境安装说明，可直接下载并启动最新 GitHub Release 安装器。
+- 明确说明 Bonjour Print Services 是设备发现必需依赖，提供 Apple 官方链接及缺失时的
+  安装、启动行为。
+- 移除文档和打包指引中的构建机路径；打包脚本改为要求显式指定 MSYS2 根目录或设置环境变量。
+- 安装器与当前用户卸载信息版本更新为 `1.0.1`。
+
 ## 2026-06-30 - Self-contained Windows installer
 
 ### Added
@@ -43,7 +68,7 @@ here.
 
 ### Verified
 
-- Installed successfully to `F:\Iphone_Mirroring\Test2`.
+- Installed successfully to a user-selected folder.
 - Desktop shortcut points to `Start-iPhoneMirroring.cmd` in the selected install
   folder.
 - Clean PATH startup works without relying on global MSYS2 or global GStreamer.
@@ -61,5 +86,5 @@ here.
   `opengl` 视频输出插件。
 - 修复镜像音频 AAC 初始化和音画同步问题。
 - 启动器会自动配置安装目录内的 GStreamer DLL、插件路径和插件扫描器。
-- 已验证安装到 `F:\Iphone_Mirroring\Test2` 后可以独立启动，不依赖全局 MSYS2
+- 已验证安装到用户选择的目录后可以独立启动，不依赖全局 MSYS2
   或全局 GStreamer。

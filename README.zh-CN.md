@@ -12,13 +12,14 @@ GStreamer 运行依赖、桌面快捷方式，以及 Windows 下的音画同步�
 
 [下载 iPhone-Mirroring-Setup.exe](https://github.com/TomTang701/Iphone_Mirroring/releases/latest/download/iPhone-Mirroring-Setup.exe)
 
-安装程序会把应用、GStreamer DLL、插件和启动脚本安装到你选择的目录，并自动创建
+安装程序默认建议使用 `%LOCALAPPDATA%\iPhoneMirroring`，也可以在安装窗口中选择
+其他目录。应用、GStreamer DLL、插件和启动脚本都会安装到最终选定的目录，并自动创建
 名为 **iPhone Mirroring** 的桌面快捷方式。
 
 ## 快速使用
 
 1. 下载并运行 `iPhone-Mirroring-Setup.exe`。
-2. 选择安装目录，例如 `F:\Iphone_Mirroring\Test2`。
+2. 保留默认的当前用户目录，或选择其他安装目录。
 3. 双击桌面上的 **iPhone Mirroring** 快捷方式。
 4. 在 iPhone 或 iPad 控制中心打开 **屏幕镜像**，选择该接收器。
 
@@ -26,13 +27,37 @@ GStreamer 运行依赖、桌面快捷方式，以及 Windows 下的音画同步�
 便携 DLL 路径、GStreamer 插件路径、插件扫描器和 registry 路径，然后再启动
 `rpiplay.exe`。
 
+## PowerShell 零环境一键安装
+
+不需要安装 Git、MSYS2、Python、CMake 或单独的 GStreamer。在普通 Windows 电脑上，
+将以下内容粘贴到 PowerShell，即可把最新 GitHub Release 安装器下载到临时目录并启动：
+
+```powershell
+$installerUrl = 'https://github.com/TomTang701/Iphone_Mirroring/releases/latest/download/iPhone-Mirroring-Setup.exe'
+$installerPath = Join-Path $env:TEMP 'iPhone-Mirroring-Setup.exe'
+Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
+Start-Process -FilePath $installerPath -Wait
+```
+
+安装窗口会让用户选择目标目录。下载需要联网；如果未安装 Bonjour，安装过程仍可能提示
+单独安装它。
+
 ## 依赖说明
 
 安装包已经包含此版本需要的 MSYS2/UCRT64 运行文件，包括视频、音频和 Windows 窗口
 输出所需的 GStreamer DLL 与插件。
 
-Bonjour 仍然是必须的，因为 iOS 设备需要通过它发现 AirPlay 接收器。如果电脑没有
-Bonjour，安装器或启动器会提示安装 Apple Bonjour Print Services。
+### Bonjour Print Services（设备发现必需依赖）
+
+[Apple Bonjour Print Services for Windows](https://support.apple.com/en-us/106380)
+是让 iPhone 和 iPad 在“屏幕镜像”中发现此 AirPlay 接收器的必需外部依赖；本项目不会
+捆绑该 Apple 安装包。
+
+- 安装时缺少 Bonjour：安装器会询问是否下载并启动 Apple 的
+  `BonjourPSSetup.exe`；Apple 安装器可能要求管理员确认。
+- 如果跳过 Bonjour，iPhone Mirroring 仍会安装完成，但 iPhone/iPad 无法在“屏幕镜像”
+  中发现该接收器。
+- 启动应用时仍缺少 Bonjour：启动器会说明问题并自动打开上方的 Apple 支持页面。
 
 ## 这个 Windows 版本做了什么
 
@@ -45,16 +70,20 @@ Bonjour，安装器或启动器会提示安装 Apple Bonjour Print Services。
 
 ## 构建安装包
 
-安装包从本机 MSYS2/UCRT64 环境构建。
+安装包从本机 MSYS2/UCRT64 环境构建。先在 MSYS2 UCRT64 终端中构建
+`rpiplay.exe`，然后在仓库根目录用 PowerShell 执行打包脚本：
 
 ```powershell
-cd F:\Iphone_Mirroring\Iphone_Mirroring-main
-F:\msys64\usr\bin\bash.exe -lc "export PATH=/ucrt64/bin:/usr/bin:/bin:$PATH; cd /f/Iphone_Mirroring/Iphone_Mirroring-main && cmake --build build-local"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\packaging\Build-Installer.ps1 -KeepWork
+# 在 MSYS2 UCRT64 终端中执行
+cmake --build build-local
+
+# 在仓库根目录的 PowerShell 中执行
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\packaging\Build-Installer.ps1 -MsysRoot '<MSYS2 根目录>' -KeepWork
 ```
 
-默认情况下，`Build-Installer.ps1` 使用 `F:\msys64`。如果你的 MSYS2 在其他目录，
-请先设置 `RPIPLAY_PACKAGE_MSYS_ROOT` 环境变量。
+将 `<MSYS2 根目录>` 替换为构建机器上的实际 MSYS2 安装目录；也可以改为先设置
+`RPIPLAY_PACKAGE_MSYS_ROOT` 环境变量。安装器及其内嵌内容只会使用最终用户选择的
+安装目录，不会写入构建机器路径。
 
 ## 手动启动参数
 

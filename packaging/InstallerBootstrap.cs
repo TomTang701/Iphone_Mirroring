@@ -5,6 +5,10 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Forms;
 
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyInformationalVersion("1.0.1")]
+
 internal static class InstallerBootstrap
 {
     [STAThread]
